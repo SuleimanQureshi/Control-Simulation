@@ -38,7 +38,7 @@ v_1_initial = 0;
 v_2_initial = 0;
 
 global testing_desired_angle;
-testing_desired_angle = zeros(1,length(t));
+testing_desired_angle = zeros(1,length(T));
 
 %% 
 % Defining the Trajectory (with control inputs, linear velocity and steering 
@@ -59,8 +59,10 @@ global y_ref;
 radius = 6;
 % x_ref = radius*cos(2*pi*T/t_stop-pi/2) ;
 % y_ref = radius*sin(2*pi*T/t_stop-pi/2) + 6;
-x_ref = T*2;
-y_ref = 3*sin(3*pi*T/t_stop);
+waypoints = [0 0;
+            5 5;
+            5 1;
+            -8 8;];
 
 X = [
     zeros(1,length(T)); % x_0 
@@ -131,18 +133,22 @@ function [X_Dot, V_1_2] = transf_func(X_prev,u)
 end
 
 global test_int;
-test_int = zeros(1,length(t));
+test_int = zeros(1,length(T));
 
-function  [v_path, phi_path, e_prev, int_val] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev)
+function  [v_path, phi_path, e_prev, int_val] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint)
     global x_ref
     global y_ref
     global dt
     global Lw0
     global testing_desired_angle;
     global test_int;        
-
-    x_ref_dot = (x_ref(t)-x_ref(t-1))/dt;
-    y_ref_dot = (y_ref(t)-y_ref(t-1))/dt;
+        
+    %changing waypoints
+    wp_dist = 0.1; % distance 
+    if X_prev(1)
+    
+    x_ref_dot = 0;
+    y_ref_dot = 0;
 
     e_x = x_ref(t)-X_prev(1);
     e_y = y_ref(t)-X_prev(2);
@@ -183,10 +189,11 @@ k_gains = [ 4 1.0 2.55 1.0]; % just chosen rn from the paper
 epsilon = pi/2;
 int_val = [0 0];
 e_prev = [0 0];
+current_waypoint = 1;
 for t = 2:length(T)
     % v_path = 1;
     % phi_path = pi/10*cos(T(t-1));
-    [v_path, phi_path, int_val, e_prev] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev);
+    [v_path, phi_path, int_val, e_prev] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint);
     [X_Dot, V_1_2] = transf_func(X(1:7,t-1), [v_path,phi_path]);
     X(1:5,t) = X(1:5,t-1) + dt*X_Dot;
     X(6:7,t) = V_1_2;
