@@ -63,7 +63,8 @@ radius = 6;
 waypoints = [            
             5 1;
             15 5;
-            8 8;];
+            15 10;
+            8 11;];
 
 X = [
     zeros(1,length(T)); % x_0 
@@ -146,6 +147,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     global test_int;        
 
     v_limit = 5;
+    phi_limit = pi/3;
 
     e_x = waypoints(current_waypoint,1)-X_prev(1);
     e_y = waypoints(current_waypoint,2)-X_prev(2);
@@ -156,19 +158,20 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 
     %changing waypoints
     
-    wp_dist = 0.2; % distance to change waypoints
+    wp_dist = 0.5; % distance to change waypoints
     if (row <= wp_dist)
         if (current_waypoint ~= length(waypoints))
             current_waypoint=current_waypoint + 1;
         end
-        x_ref_dot = (waypoints(current_waypoint-1,1)-waypoints(current_waypoint,1))/dt;
-        y_ref_dot = (waypoints(current_waypoint-1,2)-waypoints(current_waypoint,2))/dt;
+        % x_ref_dot = (waypoints(current_waypoint-1,1)-waypoints(current_waypoint,1))/dt;
+        % y_ref_dot = (waypoints(current_waypoint-1,2)-waypoints(current_waypoint,2))/dt;
+        x_ref_dot = 0;
+        y_ref_dot = 0;
         %recalculate everything
         e_x = waypoints(current_waypoint,1)-X_prev(1);
         e_y = waypoints(current_waypoint,2)-X_prev(2);
     
         psi = (atan2(e_y,e_x)) - X_prev(3);
-        testing_desired_angle(t) =   (atan2(e_y,e_x));
         row = sqrt(e_x^2 + e_y^2);
     else
         x_ref_dot = 0;
@@ -193,10 +196,17 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 
     theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
     % theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int 
+    testing_desired_angle(t) =  theta_dot_PID ;
+
     phi_path = (atan2(theta_dot_PID*Lw0,v_path));
-    if abs(v_path) > v_limit
+
+    % if abs(phi_path) > phi_limit
+    %     phi_path = abs(phi_path)/phi_path*phi_limit;
+    % end
+    if (abs(v_path) > v_limit)
         v_path = abs(v_path)/v_path*v_limit;
     end
+
     e_prev = [e_x, e_y];
 
 
@@ -205,9 +215,9 @@ end
 
 theta_0_temp_test = zeros(1,length(T));
 % Initialization of PID values
-k_gains = [ 32 0.25 2.55 2.0]; % just chosen rn from the paper
-epsilon = pi/2;
-int_val = [0 0];
+k_gains = [ 32 0.25 2.55 0.3]; % sorta tuned
+epsilon = 100;
+int_val = [0 0]; %integration value
 e_prev = [0 0];
 current_waypoint = 1;
 for t = 2:length(T)
@@ -328,7 +338,7 @@ end
 for i = 1:length(T)
     clf;
     hold on;
-    xlim([-15 20]); ylim([-10 10]);
+    xlim([-15 20]); ylim([-10 12]);
     grid on;
     xlabel('meters'); ylabel('meters');
     title(sprintf('Truck-trailer system at t = %.2f s',T(i)))
