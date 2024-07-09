@@ -37,8 +37,7 @@ theta_2_initial = 0;
 v_1_initial = 0;
 v_2_initial = 0;
 
-global testing_desired_angle;
-testing_desired_angle = zeros(1,length(T));
+
 
 %% 
 % Defining the Trajectory (with control inputs, linear velocity and steering 
@@ -52,6 +51,8 @@ dt = 0.05;
 t_start = 0;
 t_stop = 15;
 T = t_start:dt:t_stop;
+
+
 
 %Reference Trajectory
 global x_ref;
@@ -134,7 +135,8 @@ end
 
 global test_int;
 test_int = zeros(2,length(T));
-
+global testing_desired_angle;
+testing_desired_angle = zeros(1,length(T));
 function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint)
     global x_ref
     global y_ref
@@ -143,7 +145,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     global testing_desired_angle;
     global test_int;        
 
-    v_limit = 4;
+    v_limit = 5;
 
     e_x = waypoints(current_waypoint,1)-X_prev(1);
     e_y = waypoints(current_waypoint,2)-X_prev(2);
@@ -154,7 +156,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 
     %changing waypoints
     
-    wp_dist = 0.1; % distance to change waypoints
+    wp_dist = 0.2; % distance to change waypoints
     if (row <= wp_dist)
         if (current_waypoint ~= length(waypoints))
             current_waypoint=current_waypoint + 1;
@@ -166,7 +168,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         e_y = waypoints(current_waypoint,2)-X_prev(2);
     
         psi = (atan2(e_y,e_x)) - X_prev(3);
-        testing_desired_angle(t) =  psi;
+        testing_desired_angle(t) =   (atan2(e_y,e_x));
         row = sqrt(e_x^2 + e_y^2);
     else
         x_ref_dot = 0;
@@ -203,7 +205,7 @@ end
 
 theta_0_temp_test = zeros(1,length(T));
 % Initialization of PID values
-k_gains = [ 3 1.0 2.55 1.0]; % just chosen rn from the paper
+k_gains = [ 32 0.25 2.55 2.0]; % just chosen rn from the paper
 epsilon = pi/2;
 int_val = [0 0];
 e_prev = [0 0];
@@ -333,10 +335,9 @@ for i = 1:length(T)
     drawRobotsystem(x_0(i), y_0(i), rad2deg(theta_0(i)), rad2deg(theta_1(i)), rad2deg(theta_2(i)), x_1(i),y_1(i),x_2(i),y_2(i));
     % Trace out the path that has been followed
     plot(x_0(1,1:i),y_0(1,1:i));
-    % plot(x_ref,y_ref, 'LineWidth',2,'Color','r');
-    % plot(x_ref(i),y_ref(i),'r-o')
     plot(waypoints(:,1),waypoints(:,2),'rx','LineWidth',2)
-    legend('Path Followed','Reference Trajectory')
+    L = legend('Path Followed','Waypoints');
+    L.AutoUpdate = 'off';
     % Plotting out the connnections between the tractor and trailers
     plot([x_h_0(i), x_0(i)],[y_h_0(i), y_0(i)],  'g-');
     plot( [x_h_0(i), x_1(i)],[y_h_0(i), y_1(i)], 'r-');
@@ -346,3 +347,8 @@ for i = 1:length(T)
     pause(0.001);
 
 end
+% close all
+% plot(testing_desired_angle)
+% hold on
+% plot(theta_0)
+% xlim([0 150])
