@@ -59,10 +59,10 @@ global y_ref;
 radius = 6;
 % x_ref = radius*cos(2*pi*T/t_stop-pi/2) ;
 % y_ref = radius*sin(2*pi*T/t_stop-pi/2) + 6;
-waypoints = [0 0;
-            5 5;
+waypoints = [            
             5 1;
-            -8 8;];
+            15 5;
+            8 8;];
 
 X = [
     zeros(1,length(T)); % x_0 
@@ -133,36 +133,50 @@ function [X_Dot, V_1_2] = transf_func(X_prev,u)
 end
 
 global test_int;
-test_int = zeros(1,length(T));
+test_int = zeros(2,length(T));
 
-function  [v_path, phi_path, e_prev, int_val] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint)
+function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint)
     global x_ref
     global y_ref
     global dt
     global Lw0
     global testing_desired_angle;
     global test_int;        
-        
-    %changing waypoints
-    wp_dist = 0.1; % distance 
-    if X_prev(1)
-    
-    x_ref_dot = 0;
-    y_ref_dot = 0;
 
-    e_x = x_ref(t)-X_prev(1);
-    e_y = y_ref(t)-X_prev(2);
+    v_limit = 4;
 
+    e_x = waypoints(current_waypoint,1)-X_prev(1);
+    e_y = waypoints(current_waypoint,2)-X_prev(2);
 
     psi = (atan2(e_y,e_x)) - X_prev(3);
     testing_desired_angle(t) =  psi;
     row = sqrt(e_x^2 + e_y^2);
 
+    %changing waypoints
+    
+    wp_dist = 0.1; % distance to change waypoints
+    if (row <= wp_dist)
+        if (current_waypoint ~= length(waypoints))
+            current_waypoint=current_waypoint + 1;
+        end
+        x_ref_dot = (waypoints(current_waypoint-1,1)-waypoints(current_waypoint,1))/dt;
+        y_ref_dot = (waypoints(current_waypoint-1,2)-waypoints(current_waypoint,2))/dt;
+        %recalculate everything
+        e_x = waypoints(current_waypoint,1)-X_prev(1);
+        e_y = waypoints(current_waypoint,2)-X_prev(2);
+    
+        psi = (atan2(e_y,e_x)) - X_prev(3);
+        testing_desired_angle(t) =  psi;
+        row = sqrt(e_x^2 + e_y^2);
+    else
+        x_ref_dot = 0;
+        y_ref_dot = 0;
+    end
+    
     
     psi_int = int_val(1) + dt*psi;
     row_int = int_val(2) + dt*row;
     int_val = [psi_int row_int];
-    test_int(t) = psi_int;
 
     if (abs(psi) < epsilon)
         v_path = (k_gains(3)*row+k_gains(4)*row_int)/cos(psi) + (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi));
@@ -172,11 +186,15 @@ function  [v_path, phi_path, e_prev, int_val] = PID(X_prev,t,int_val,k_gains,eps
     end
     tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
     % phi_path = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
+    test_int(:,t) = [(k_gains(3)*row+k_gains(4)*row_int)/cos(psi), (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi)); ];
 
 
     theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
     % theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int 
     phi_path = (atan2(theta_dot_PID*Lw0,v_path));
+    if abs(v_path) > v_limit
+        v_path = abs(v_path)/v_path*v_limit;
+    end
     e_prev = [e_x, e_y];
 
 
@@ -185,7 +203,7 @@ end
 
 theta_0_temp_test = zeros(1,length(T));
 % Initialization of PID values
-k_gains = [ 4 1.0 2.55 1.0]; % just chosen rn from the paper
+k_gains = [ 3 1.0 2.55 1.0]; % just chosen rn from the paper
 epsilon = pi/2;
 int_val = [0 0];
 e_prev = [0 0];
@@ -193,7 +211,7 @@ current_waypoint = 1;
 for t = 2:length(T)
     % v_path = 1;
     % phi_path = pi/10*cos(T(t-1));
-    [v_path, phi_path, int_val, e_prev] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint);
+    [v_path, phi_path, int_val, e_prev, current_waypoint] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint);
     [X_Dot, V_1_2] = transf_func(X(1:7,t-1), [v_path,phi_path]);
     X(1:5,t) = X(1:5,t-1) + dt*X_Dot;
     X(6:7,t) = V_1_2;
@@ -315,8 +333,9 @@ for i = 1:length(T)
     drawRobotsystem(x_0(i), y_0(i), rad2deg(theta_0(i)), rad2deg(theta_1(i)), rad2deg(theta_2(i)), x_1(i),y_1(i),x_2(i),y_2(i));
     % Trace out the path that has been followed
     plot(x_0(1,1:i),y_0(1,1:i));
-    plot(x_ref,y_ref, 'LineWidth',2,'Color','r');
-    plot(x_ref(i),y_ref(i),'r-o')
+    % plot(x_ref,y_ref, 'LineWidth',2,'Color','r');
+    % plot(x_ref(i),y_ref(i),'r-o')
+    plot(waypoints(:,1),waypoints(:,2),'rx','LineWidth',2)
     legend('Path Followed','Reference Trajectory')
     % Plotting out the connnections between the tractor and trailers
     plot([x_h_0(i), x_0(i)],[y_h_0(i), y_0(i)],  'g-');
