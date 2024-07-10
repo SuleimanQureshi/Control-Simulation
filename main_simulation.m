@@ -137,18 +137,24 @@ end
 global test_int;
 test_int = zeros(2,length(T));
 global testing_desired_angle;
-testing_desired_angle = zeros(1,length(T));
-function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint)
+testing_desired_angle = zeros(2,length(T));
+function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint,prev_vel,prev_phi)
     global x_ref
     global y_ref
     global dt
     global Lw0
     global testing_desired_angle;
-    global test_int;        
+    global test_int;   
 
-    v_limit = 5;
-    phi_limit = pi/3;
-
+    % NOTE: these aren't real values like m/s^2 etc, these are just
+    % temporary values for PoC, these will be experimentally gathered and
+    % implemented then and we will also have to take care of sampleTime dt
+    v_limit = 5; %velocity limit
+    phi_limit = pi/6; %steering angle limit
+    a_limit = 0.4; %acceleration limit 
+    deceleration_limit = 1; %deacceleration limit
+    ang_vel_limit = 1; %angular velocity limit
+    
     e_x = waypoints(current_waypoint,1)-X_prev(1);
     e_y = waypoints(current_waypoint,2)-X_prev(2);
 
@@ -162,6 +168,10 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     if (row <= wp_dist)
         if (current_waypoint ~= length(waypoints))
             current_waypoint=current_waypoint + 1;
+        else
+            v_path = 0;
+            phi_path = 0;
+            return
         end
         % x_ref_dot = (waypoints(current_waypoint-1,1)-waypoints(current_waypoint,1))/dt;
         % y_ref_dot = (waypoints(current_waypoint-1,2)-waypoints(current_waypoint,2))/dt;
@@ -187,29 +197,39 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         v_path = (k_gains(3)*row+k_gains(4)*row_int)/cos(psi) + (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi));
         % v_path = k_gains(3)*row+k_gains(4)*row_int;
     else
-        v_path = 0.0001;
+        v_path = 0.1;
     end
     tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
     % phi_path = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
-    test_int(:,t) = [(k_gains(3)*row+k_gains(4)*row_int)/cos(psi), (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi)); ];
+    % test_int(:,t) = [(k_gains(3)*row+k_gains(4)*row_int)/cos(psi), (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi)); ];
 
 
     theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
     % theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int 
-    testing_desired_angle(t) =  theta_dot_PID ;
 
     phi_path = (atan2(theta_dot_PID*Lw0,v_path));
-
-    % if abs(phi_path) > phi_limit
-    %     phi_path = abs(phi_path)/phi_path*phi_limit;
-    % end
+    if (v_path-prev_vel) > a_limit
+        v_path = prev_vel + a_limit;
+    end
+    if (v_path-prev_vel) < -deceleration_limit
+        v_path = prev_vel - deceleration_limit;
+    end
+    if abs(phi_path-prev_phi) > ang_vel_limit
+        phi_path = prev_phi + ang_vel_limit;
+    end
+    if abs(phi_path) > phi_limit
+        phi_path = abs(phi_path)/phi_path*phi_limit;
+    end
     if (abs(v_path) > v_limit)
         v_path = abs(v_path)/v_path*v_limit;
     end
-
     e_prev = [e_x, e_y];
 
 
+
+    test_int(1,t) = v_path;
+    testing_desired_angle(1,t) =  theta_dot_PID ;
+    testing_desired_angle(2,t) =  phi_path ;
 
 end
 
@@ -220,10 +240,12 @@ epsilon = 100;
 int_val = [0 0]; %integration value
 e_prev = [0 0];
 current_waypoint = 1;
+v_path = 0;
+phi_path = 0;
 for t = 2:length(T)
     % v_path = 1;
     % phi_path = pi/10*cos(T(t-1));
-    [v_path, phi_path, int_val, e_prev, current_waypoint] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint);
+    [v_path, phi_path, int_val, e_prev, current_waypoint] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint, v_path,phi_path);
     [X_Dot, V_1_2] = transf_func(X(1:7,t-1), [v_path,phi_path]);
     X(1:5,t) = X(1:5,t-1) + dt*X_Dot;
     X(6:7,t) = V_1_2;
@@ -346,7 +368,7 @@ for i = 1:length(T)
     % Trace out the path that has been followed
     plot(x_0(1,1:i),y_0(1,1:i));
     plot(waypoints(:,1),waypoints(:,2),'rx','LineWidth',2)
-    L = legend('Path Followed','Waypoints');
+    L = legend('','','','','Path Followed','Waypoints');
     L.AutoUpdate = 'off';
     % Plotting out the connnections between the tractor and trailers
     plot([x_h_0(i), x_0(i)],[y_h_0(i), y_0(i)],  'g-');
@@ -362,3 +384,9 @@ end
 % hold on
 % plot(theta_0)
 % xlim([0 150])
+close all
+plot(T,test_int(1,:))
+hold on
+plot(T,testing_desired_angle(2,:))
+hold on
+plot(T,testing_desired_angle(1,:))
