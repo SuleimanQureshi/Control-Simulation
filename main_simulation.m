@@ -4,7 +4,7 @@
 % Defining without convention (Tractor length,width , trailer length,width) 
 % 
 % Following Convention Lw0, Lh0, Lw1, Lh1, Lw2, Lh2
-
+clear
 % These values are yet to be measured/ corrected
 global tractor_length;
 global tractor_width;
@@ -60,11 +60,17 @@ global y_ref;
 radius = 6;
 % x_ref = radius*cos(2*pi*T/t_stop-pi/2) ;
 % y_ref = radius*sin(2*pi*T/t_stop-pi/2) + 6;
+
 waypoints = [            
             5 1;
             15 5;
-            15 10;
-            8 11;];
+            5 1;
+            12 10;
+            8 11;
+            1 10;
+            ];
+
+% waypoints = [randi(14) randi(14); randi(14) randi(14); randi(14) randi(14); randi(14) randi(14); randi(14) randi(14);];
 
 X = [
     zeros(1,length(T)); % x_0 
@@ -137,7 +143,26 @@ end
 global test_int;
 test_int = zeros(2,length(T));
 global testing_desired_angle;
+
+global angle_error;
+angle_error = zeros(1,length(T));
+
+global distance_error;
+angle_error = zeros(1,length(T));
+
+global another_test;
+another_test = zeros(1,length(T));
+
+global another_test2;
+another_test2 = zeros(1,length(T));
+
+
 testing_desired_angle = zeros(2,length(T));
+
+function [x] = manual_mod(a,b)
+    x = a-fix(a/b)*b;
+end
+
 function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint,prev_vel,prev_phi)
     global x_ref
     global y_ref
@@ -145,25 +170,31 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     global Lw0
     global testing_desired_angle;
     global test_int;   
+    global distance_error;
+    global angle_error;
+    global another_test2;
+
 
     % NOTE: these aren't real values like m/s^2 etc, these are just
     % temporary values for PoC, these will be experimentally gathered and
     % implemented then and we will also have to take care of sampleTime dt
     v_limit = 5; %velocity limit
-    phi_limit = pi/6; %steering angle limit
+    phi_limit = pi/3; %steering angle limit
     a_limit = 0.4; %acceleration limit 
     deceleration_limit = 1; %deacceleration limit
-    ang_vel_limit = 1; %angular velocity limit
+    ang_vel_limit = 0.4; %angular velocity limit
     
     e_x = waypoints(current_waypoint,1)-X_prev(1);
     e_y = waypoints(current_waypoint,2)-X_prev(2);
 
     psi = (atan2(e_y,e_x)) - X_prev(3);
-    testing_desired_angle(t) =  psi;
+    % psi = manual_mod(psi,2*pi);
+    psi = wrapToPi(psi);
+    testing_desired_angle(1,t) =  psi;
     row = sqrt(e_x^2 + e_y^2);
+    distance_error(t) = row;
 
     %changing waypoints
-    
     wp_dist = 0.5; % distance to change waypoints
     if (row <= wp_dist)
         if (current_waypoint ~= length(waypoints))
@@ -182,22 +213,72 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         e_y = waypoints(current_waypoint,2)-X_prev(2);
     
         psi = (atan2(e_y,e_x)) - X_prev(3);
+        % psi = manual_mod(psi,2*pi);
+        psi = wrapToPi(psi);
+
+        testing_desired_angle(1,t) =  psi;
+
         row = sqrt(e_x^2 + e_y^2);
     else
         x_ref_dot = 0;
         y_ref_dot = 0;
     end
     
-    
+    angle_error(t) = psi;
+
     psi_int = int_val(1) + dt*psi;
     row_int = int_val(2) + dt*row;
     int_val = [psi_int row_int];
-
+    
     if (abs(psi) < epsilon)
         v_path = (k_gains(3)*row+k_gains(4)*row_int)/cos(psi) + (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi));
         % v_path = k_gains(3)*row+k_gains(4)*row_int;
     else
-        v_path = 0.1;
+        disp("here")
+        another_test2(t) = 5;
+        v_path = 2;
+        phi_path = (psi)/abs(psi)*phi_limit;
+        % x = (psi);
+        % phi_path = (wrapToPi(x))/abs(wrapToPi(x))*phi_limit;
+
+        if (abs(phi_path) > phi_limit)
+        phi_path = phi_limit*abs(phi_path)/phi_path;
+        end
+        
+        if ((v_path-prev_vel) > a_limit)
+            v_path = prev_vel + a_limit;
+            
+        end
+    
+        if ((v_path-prev_vel) < -deceleration_limit)
+            v_path = prev_vel - deceleration_limit;
+        end
+    
+        if ((phi_path-prev_phi) > ang_vel_limit)
+            phi_path = prev_phi + ang_vel_limit;
+            disp("123")
+        end
+    
+        if ((phi_path-prev_phi) < -ang_vel_limit)
+            phi_path = prev_phi - ang_vel_limit;
+                        disp("456")
+
+        end
+    
+        if (abs(phi_path) > phi_limit)
+            phi_path = phi_limit*abs(phi_path)/phi_path;
+                        disp("789")
+
+        end
+    
+        if (abs(v_path) > v_limit)
+            v_path = abs(v_path)/v_path*v_limit;
+                        disp("abc")
+
+        end
+        e_prev = [e_x, e_y];
+        return
+
     end
     tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
     % phi_path = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
@@ -208,35 +289,53 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     % theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int 
 
     phi_path = (atan2(theta_dot_PID*Lw0,v_path));
-    if (v_path-prev_vel) > a_limit
+    testing_desired_angle(1,t) =  phi_path ;
+
+    
+    if (abs(phi_path) > phi_limit)
+        phi_path = phi_limit*abs(phi_path)/phi_path;
+    end
+    
+    if ((v_path-prev_vel) > a_limit)
         v_path = prev_vel + a_limit;
     end
-    if (v_path-prev_vel) < -deceleration_limit
+
+    if ((v_path-prev_vel) < -deceleration_limit)
         v_path = prev_vel - deceleration_limit;
     end
-    if abs(phi_path-prev_phi) > ang_vel_limit
+
+    if ((phi_path-prev_phi) > ang_vel_limit)
         phi_path = prev_phi + ang_vel_limit;
     end
-    if abs(phi_path) > phi_limit
-        phi_path = abs(phi_path)/phi_path*phi_limit;
+
+    if ((phi_path-prev_phi) < -ang_vel_limit)
+        phi_path = prev_phi - ang_vel_limit;
     end
+
+    if (abs(phi_path) > phi_limit)
+        phi_path = phi_limit*abs(phi_path)/phi_path;
+    end
+
     if (abs(v_path) > v_limit)
         v_path = abs(v_path)/v_path*v_limit;
+    end
+
+    if ((v_path) < 0)
+        v_path = 0.4;
     end
     e_prev = [e_x, e_y];
 
 
 
     test_int(1,t) = v_path;
-    testing_desired_angle(1,t) =  theta_dot_PID ;
     testing_desired_angle(2,t) =  phi_path ;
-
+    
 end
 
 theta_0_temp_test = zeros(1,length(T));
 % Initialization of PID values
 k_gains = [ 32 0.25 2.55 0.3]; % sorta tuned
-epsilon = 100;
+epsilon = pi/2-0.01;
 int_val = [0 0]; %integration value
 e_prev = [0 0];
 current_waypoint = 1;
@@ -246,6 +345,7 @@ for t = 2:length(T)
     % v_path = 1;
     % phi_path = pi/10*cos(T(t-1));
     [v_path, phi_path, int_val, e_prev, current_waypoint] = PID(X(1:7,t-1), t , int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint, v_path,phi_path);
+    another_test(t) = phi_path;
     [X_Dot, V_1_2] = transf_func(X(1:7,t-1), [v_path,phi_path]);
     X(1:5,t) = X(1:5,t-1) + dt*X_Dot;
     X(6:7,t) = V_1_2;
@@ -357,13 +457,13 @@ function drawRobotsystem(x, y, theta, phi1, phi2, trailer1_x, trailer1_y, traile
     
     axis equal;
 end
-for i = 1:length(T)
+for i = 150:length(T)
     clf;
     hold on;
     xlim([-15 20]); ylim([-10 12]);
     grid on;
     xlabel('meters'); ylabel('meters');
-    title(sprintf('Truck-trailer system at t = %.2f s',T(i)))
+    title(sprintf('Waypoint tracking Truck-trailer system using PID at t = %.2f s, (k_1 = %.2f, k_2 = %.2f, k_3 = %.2f, k_4 = %.2f)',T(i),k_gains(1),k_gains(2),k_gains(3),k_gains(4)))
     drawRobotsystem(x_0(i), y_0(i), rad2deg(theta_0(i)), rad2deg(theta_1(i)), rad2deg(theta_2(i)), x_1(i),y_1(i),x_2(i),y_2(i));
     % Trace out the path that has been followed
     plot(x_0(1,1:i),y_0(1,1:i));
@@ -376,7 +476,7 @@ for i = 1:length(T)
     plot([x_h_1(i), x_1(i)],[y_h_1(i), y_1(i)],  'g-');
     plot( [x_h_1(i), x_2(i)],[y_h_1(i), y_2(i)], 'r-');
     plot([x_h_2(i), x_2(i)], [y_h_2(i), y_2(i)],  'g-');
-    pause(0.001);
+    pause(0.0001);
 
 end
 % close all
@@ -384,9 +484,16 @@ end
 % hold on
 % plot(theta_0)
 % xlim([0 150])
-close all
-plot(T,test_int(1,:))
+figure;
+plot(T,distance_error)
 hold on
+plot(T,angle_error)
+% title("Errors")
+% legend('Distance Error', 'Angle Error');
+% xlabel("Time (s)")
+% ylabel("Amplitude")
+
+
 plot(T,testing_desired_angle(2,:))
 hold on
 plot(T,testing_desired_angle(1,:))
