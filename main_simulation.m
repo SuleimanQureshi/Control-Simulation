@@ -26,7 +26,7 @@ Lw1 = 0.4;
 Lh1 = 0.4;
 Lw2 = 0.4;
 Lh2 = 0.4;
-%% 
+% 
 % Defining Initial Conditions (position and vel of carts)
 
 x_0_initial = 0;
@@ -39,7 +39,7 @@ v_2_initial = 0;
 
 
 
-%% 
+%
 % Defining the Trajectory (with control inputs, linear velocity and steering 
 % angle of front wheels) 
 % 
@@ -62,6 +62,8 @@ waypoints = [
             1 10;
             ];
 
+global change_in_waypoint;
+change_in_waypoint = ones(1,length(T));
 % waypoints = [randi(14) randi(14); randi(14) randi(14); randi(14) randi(14); randi(14) randi(14); randi(14) randi(14);];
 
 X = [
@@ -137,6 +139,7 @@ end
 function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint,prev_vel,prev_phi)
     global dt
     global Lw0
+    global change_in_waypoint
 
     % NOTE: these aren't real values like m/s^2 etc, these are just
     % temporary values for PoC, these will be experimentally gathered and
@@ -154,12 +157,13 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 
     psi = wrapToPi(psi);
     row = sqrt(e_x^2 + e_y^2);
-
+    change_in_waypoint(t) = change_in_waypoint(t-1);
     %changing waypoints
     wp_dist = 0.2; % distance to change waypoints
     if (row <= wp_dist)
         if (current_waypoint ~= length(waypoints))
             current_waypoint=current_waypoint + 1;
+            change_in_waypoint(t) = change_in_waypoint(t-1) + 1;
         else
             v_path = 0;
             phi_path = 0;
@@ -289,7 +293,7 @@ v_1 = X(6,:);
 v_2 = X(7,:);
 
 
-%% 
+%
 % 
 % 
 % Midpoint of trailers and hitching points
@@ -383,8 +387,9 @@ function drawRobotsystem(x, y, theta, phi1, phi2, trailer1_x, trailer1_y, traile
     
     axis equal;
 end
+anim = figure('WindowState','maximized');
 for i = 1:length(T)
-    clf;
+    clf(anim);
     hold on;
     xlim([-15 20]); ylim([-10 12]);
     grid on;
@@ -405,3 +410,25 @@ for i = 1:length(T)
     pause(0.0001);
 
 end
+
+%% Plotting Errors
+%Distance from origin over time of tractor
+tractor_distance_from_O = sqrt(x_0.^2 + y_0.^2);
+trailer1_distance_from_O = sqrt(x_1.^2 + y_1.^2);
+trailer2_distance_from_O = sqrt(x_2.^2 + y_2.^2);
+
+current_waypoint_distance = zeros(1,length(T));
+for i = 1:length(change_in_waypoint)
+    current_waypoint_distance(i) = sqrt(waypoints(change_in_waypoint(i),1)^2+waypoints(change_in_waypoint(i),2)^2);
+end
+figure('WindowState','maximized');
+hold on
+plot(T,current_waypoint_distance)
+plot(T,tractor_distance_from_O)
+plot(T,trailer1_distance_from_O)
+plot(T,trailer2_distance_from_O)
+legend('Current Waypoint','Tractor','Trailer 1', 'Trailer 2')
+ylabel('Distance')
+xlabel('Time')
+title('Head-Focused Tracking - Distance from Origin of Current Waypoint, Tractor and Trailers')
+
