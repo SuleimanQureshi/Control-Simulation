@@ -134,12 +134,18 @@ function [X_Dot, V_1_2] = transf_func(X_prev,u)
     ];
 end
 
-
+global row_test;
+row_test = zeros(1,length(T));
 
 function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,int_val,k_gains,epsilon,e_prev,waypoints,current_waypoint,prev_vel,prev_phi)
     global dt
     global Lw0
     global change_in_waypoint
+    global Lw1;
+    global Lh0;
+    global row_test;
+
+
 
     % NOTE: these aren't real values like m/s^2 etc, these are just
     % temporary values for PoC, these will be experimentally gathered and
@@ -150,16 +156,22 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     deceleration_limit = 1; %deacceleration limit
     ang_vel_limit = 0.4; %angular velocity limit
     
-    e_x = waypoints(current_waypoint,1)-X_prev(1);
-    e_y = waypoints(current_waypoint,2)-X_prev(2);
 
-    psi = (atan2(e_y,e_x)) - wrapToPi(X_prev(3));
+    x_1_prev = X_prev(1) - Lw1*cos(X_prev(4))-Lh0*cos(X_prev(3));
+    y_1_prev = X_prev(2) - Lw1*sin(X_prev(4))-Lh0*sin(X_prev(3));
+    
+
+    e_x = waypoints(current_waypoint,1)-x_1_prev;
+    e_y = waypoints(current_waypoint,2)-y_1_prev;
+
+    psi = (atan2(e_y,e_x)) - wrapToPi(X_prev(4));
 
     psi = wrapToPi(psi);
     row = sqrt(e_x^2 + e_y^2);
+    row_test(t) = row;
     change_in_waypoint(t) = change_in_waypoint(t-1);
     %changing waypoints
-    wp_dist = 0.2; % distance to change waypoints
+    wp_dist = 0.6; % distance to change waypoints
     if (row <= wp_dist)
         if (current_waypoint ~= length(waypoints))
             current_waypoint=current_waypoint + 1;
@@ -173,10 +185,10 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         x_ref_dot = 0;
         y_ref_dot = 0;
         %recalculate everything
-        e_x = waypoints(current_waypoint,1)-X_prev(1);
-        e_y = waypoints(current_waypoint,2)-X_prev(2);
+        e_x = waypoints(current_waypoint,1)-x_1_prev;
+        e_y = waypoints(current_waypoint,2)-y_1_prev;
     
-        psi = (atan2(e_y,e_x)) - X_prev(3);
+        psi = (atan2(e_y,e_x)) - X_prev(4);
         psi = wrapToPi(psi);
 
         row = sqrt(e_x^2 + e_y^2);
@@ -190,48 +202,24 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     int_val = [psi_int row_int];
     
     if (abs(psi) < epsilon)
-        v_path = (k_gains(3)*row+k_gains(4)*row_int)/cos(psi) + (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi));
+        u1 = (k_gains(3)*row+k_gains(4)*row_int)/cos(psi) + (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi));
+        tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
+        u2 = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
+
+        v_path = sqrt(u1^2+Lw0^2 * u2^2); %v1
+        v_2 = u2 + Lw0*((u1*u2-u1*u2)/v_path^2); %second term evaluates to 0?
+
+
+        phi_path = (atan2(v_2*Lw0,v_path));
+
+
+
+
     else
         v_path = 1;
         phi_path = (psi)/abs(psi)*phi_limit;
-
-        if (abs(phi_path) > phi_limit)
-        phi_path = phi_limit*abs(phi_path)/phi_path;
-        end
-        
-        if ((v_path-prev_vel) > a_limit)
-            v_path = prev_vel + a_limit;
-            
-        end
-    
-        if ((v_path-prev_vel) < -deceleration_limit)
-            v_path = prev_vel - deceleration_limit;
-        end
-    
-        if ((phi_path-prev_phi) > ang_vel_limit)
-            phi_path = prev_phi + ang_vel_limit;
-        end
-    
-        if ((phi_path-prev_phi) < -ang_vel_limit)
-            phi_path = prev_phi - ang_vel_limit;
-
-        end
-    
-        if (abs(phi_path) > phi_limit)
-            phi_path = phi_limit*abs(phi_path)/phi_path;
-        end
-    
-        if (abs(v_path) > v_limit)
-            v_path = abs(v_path)/v_path*v_limit;
-        end
-        e_prev = [e_x, e_y];
-        return
-
     end
-    tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
-    theta_dot_PID = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
 
-    phi_path = (atan2(theta_dot_PID*Lw0,v_path));
     
     if (abs(phi_path) > phi_limit)
         phi_path = phi_limit*abs(phi_path)/phi_path;
@@ -271,7 +259,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 end
 
 % Initialization of PID values
-k_gains = [ 32 0.25 2.55 0.3]; % sort of tuned
+k_gains = [ 63 2 20 3]; % sort of tuned
 epsilon = pi/2-0.05;
 int_val = [0 0]; %integration value
 e_prev = [0 0];
@@ -430,5 +418,5 @@ plot(T,trailer2_distance_from_O)
 legend('Current Waypoint','Tractor','Trailer 1', 'Trailer 2')
 ylabel('Distance')
 xlabel('Time')
-title('Head-Focused Tracking - Distance from Origin of Current Waypoint, Tractor and Trailers')
+title('Trailer-Focused Tracking - Distance from Origin of Current Waypoint, Tractor and Trailers')
 
