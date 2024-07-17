@@ -49,7 +49,7 @@ v_2_initial = 0;
 global dt;
 dt = 0.05;
 t_start = 0;
-t_stop = 15;
+t_stop = 100;
 T = t_start:dt:t_stop;
 
 
@@ -285,7 +285,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 end
 
 % Initialization of PID values
-k_gains = [ 32 0.25 2.55 0.3]; % sort of tuned
+k_gains = [ 200 0.05 1.85 0.355]; % sort of tuned
 epsilon = pi/2-0.05;
 int_val = [0 0]; %integration value
 e_prev = [0 0];
@@ -402,17 +402,19 @@ function drawRobotsystem(x, y, theta, phi1, phi2, trailer1_x, trailer1_y, traile
     axis equal;
 end
 anim = figure('WindowState','maximized');
+% vid(1:990) = struct('cdata',zeros(800,1500,3,'uint8'),'colormap',[]);
+
 for i = 1:length(T)
     clf(anim);
     hold on;
-    xlim([-5 80]); ylim([-160 20]);
+    xlim([-50 100]); ylim([-180 30]);
     grid on;
     xlabel('meters'); ylabel('meters');
     title(sprintf('Waypoint tracking Truck-trailer system using PID at t = %.2f s, (k_1 = %.2f, k_2 = %.2f, k_3 = %.2f, k_4 = %.2f)',T(i),k_gains(1),k_gains(2),k_gains(3),k_gains(4)))
     drawRobotsystem(x_0(i), y_0(i), rad2deg(theta_0(i)), rad2deg(theta_1(i)), rad2deg(theta_2(i)), x_1(i),y_1(i),x_2(i),y_2(i));
     % Trace out the path that has been followed
     plot(x_0(1,1:i),y_0(1,1:i));
-    plot(waypoints(:,1),waypoints(:,2),'r-x','LineWidth',2)
+    plot(waypoints(:,1),waypoints(:,2),'rx','LineWidth',2)
     L = legend('','','','','Path Followed','Waypoints');
     L.AutoUpdate = 'off';
     % Plotting out the connnections between the tractor and trailers
@@ -421,28 +423,38 @@ for i = 1:length(T)
     plot([x_h_1(i), x_1(i)],[y_h_1(i), y_1(i)],  'g-');
     plot( [x_h_1(i), x_2(i)],[y_h_1(i), y_2(i)], 'r-');
     plot([x_h_2(i), x_2(i)], [y_h_2(i), y_2(i)],  'g-');
+    xlim([-50 100]); ylim([-180 30]);
+
+    hold on
+    vid(i) = getframe;
+
     pause(0.0001);
 
 end
-
-%% Plotting Errors
-%Distance from origin over time of tractor
-tractor_distance_from_O = sqrt(x_0.^2 + y_0.^2);
-trailer1_distance_from_O = sqrt(x_1.^2 + y_1.^2);
-trailer2_distance_from_O = sqrt(x_2.^2 + y_2.^2);
-
-current_waypoint_distance = zeros(1,length(T));
-for i = 1:length(change_in_waypoint)
-    current_waypoint_distance(i) = sqrt(waypoints(change_in_waypoint(i),1)^2+waypoints(change_in_waypoint(i),2)^2);
+v = VideoWriter('recordedAnimation','MPEG-4');
+open(v)
+for i = 1:length(vid)
+    writeVideo(v,vid(i))
 end
-figure('WindowState','maximized');
-hold on
-plot(T,current_waypoint_distance)
-plot(T,tractor_distance_from_O)
-plot(T,trailer1_distance_from_O)
-plot(T,trailer2_distance_from_O)
-legend('Current Waypoint','Tractor','Trailer 1', 'Trailer 2')
-ylabel('Distance')
-xlabel('Time')
-title('Head-Focused Tracking - Distance from Origin of Current Waypoint, Tractor and Trailers')
+close(v)
+%% Plotting Errors
+% %Distance from origin over time of tractor
+% tractor_distance_from_O = sqrt(x_0.^2 + y_0.^2);
+% trailer1_distance_from_O = sqrt(x_1.^2 + y_1.^2);
+% trailer2_distance_from_O = sqrt(x_2.^2 + y_2.^2);
+% 
+% current_waypoint_distance = zeros(1,length(T));
+% for i = 1:length(change_in_waypoint)
+%     current_waypoint_distance(i) = sqrt(waypoints(change_in_waypoint(i),1)^2+waypoints(change_in_waypoint(i),2)^2);
+% end
+% figure('WindowState','maximized');
+% hold on
+% plot(T,current_waypoint_distance)
+% plot(T,tractor_distance_from_O)
+% plot(T,trailer1_distance_from_O)
+% plot(T,trailer2_distance_from_O)
+% legend('Current Waypoint','Tractor','Trailer 1', 'Trailer 2')
+% ylabel('Distance')
+% xlabel('Time')
+% title('Head-Focused Tracking - Distance from Origin of Current Waypoint, Tractor and Trailers')
 
