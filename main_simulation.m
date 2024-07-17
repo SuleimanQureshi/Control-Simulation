@@ -16,24 +16,24 @@ global Lw1;
 global Lh1;
 global Lw2;
 global Lh2;
-tractor_length = 0.5;
-tractor_width = 0.3;
-trailer_length = 0.5;
-trailer_width = 0.3;
-Lw0 = 0.42;
-Lh0 = 0.4;
-Lw1 = 0.4;
-Lh1 = 0.4;
-Lw2 = 0.4;
-Lh2 = 0.4;
+tractor_length = 1.6;
+tractor_width = 0.8;
+trailer_length = 1.6*1.9;
+trailer_width = 0.9;
+Lw0 = 1.17;
+Lh0 = 0.1+tractor_length/2;
+Lw1 = 0.3+trailer_length/2;
+Lh1 = 0.1+trailer_length/2;
+Lw2 = 0.3+trailer_length/2;
+Lh2 = 0.1;
 % 
 % Defining Initial Conditions (position and vel of carts)
 
 x_0_initial = 0;
 y_0_initial = 0;
-theta_0_initial = 0;
-theta_1_initial = 0;
-theta_2_initial = 0;
+theta_0_initial = pi/2;
+theta_1_initial = pi/2;
+theta_2_initial = pi/2;
 v_1_initial = 0;
 v_2_initial = 0;
 
@@ -53,14 +53,28 @@ t_stop = 15;
 T = t_start:dt:t_stop;
 
 
-waypoints = [            
-            5 1;
-            15 5;
-            5 1;
-            12 10;
-            8 11;
-            1 10;
-            ];
+% waypoints = [            
+%             5 1;
+%             15 5;
+%             5 1;
+%             12 10;
+%             8 11;
+%             1 10;
+%             ];
+
+%at IMC
+waypoints = [0 6.9;
+
+             6.3                                6.9+6.4;
+             6.3+2.71                           6.9+6.4;
+             6.3+2.71                           6.9+6.4-123.1;
+             6.3+2.71                           6.9+6.4-123.1-6.28;
+             6.3+2.71+20.17                     6.9+6.4-123.1-6.28;
+             6.3+2.71+20.17                     6.9+6.4-123.1-6.28-36.7;
+             6.3+2.71+20.17+35.91               6.9+6.4-123.1-6.28-36.7;
+             6.3+2.71+20.17+35.91               6.9+6.4-123.1-6.28-36.7+36.8;
+             6.3+2.71+20.17+35.91+10.2          6.9+6.4-123.1-6.28-36.7+36.8;
+             6.3+2.71+20.17+35.91+10.2          6.9+6.4-123.1-6.28-36.7+36.8+36.8;];
 
 global change_in_waypoint;
 change_in_waypoint = ones(1,length(T));
@@ -391,14 +405,14 @@ anim = figure('WindowState','maximized');
 for i = 1:length(T)
     clf(anim);
     hold on;
-    xlim([-15 20]); ylim([-10 12]);
+    xlim([-5 80]); ylim([-160 20]);
     grid on;
     xlabel('meters'); ylabel('meters');
     title(sprintf('Waypoint tracking Truck-trailer system using PID at t = %.2f s, (k_1 = %.2f, k_2 = %.2f, k_3 = %.2f, k_4 = %.2f)',T(i),k_gains(1),k_gains(2),k_gains(3),k_gains(4)))
     drawRobotsystem(x_0(i), y_0(i), rad2deg(theta_0(i)), rad2deg(theta_1(i)), rad2deg(theta_2(i)), x_1(i),y_1(i),x_2(i),y_2(i));
     % Trace out the path that has been followed
     plot(x_0(1,1:i),y_0(1,1:i));
-    plot(waypoints(:,1),waypoints(:,2),'rx','LineWidth',2)
+    plot(waypoints(:,1),waypoints(:,2),'r-x','LineWidth',2)
     L = legend('','','','','Path Followed','Waypoints');
     L.AutoUpdate = 'off';
     % Plotting out the connnections between the tractor and trailers
