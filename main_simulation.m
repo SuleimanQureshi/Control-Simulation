@@ -144,6 +144,8 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     global Lw1;
     global Lh0;
     global row_test;
+    global Lw2;
+    global Lh1;
 
 
 
@@ -159,12 +161,14 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 
     x_1_prev = X_prev(1) - Lw1*cos(X_prev(4))-Lh0*cos(X_prev(3));
     y_1_prev = X_prev(2) - Lw1*sin(X_prev(4))-Lh0*sin(X_prev(3));
+    x_2_prev = x_1_prev -Lw2*cos(X_prev(5))-Lh1*cos(X_prev(4));
+    y_2_prev = y_1_prev -Lw2*sin(X_prev(5))-Lh1*sin(X_prev(4));
     
 
-    e_x = waypoints(current_waypoint,1)-x_1_prev;
-    e_y = waypoints(current_waypoint,2)-y_1_prev;
+    e_x = waypoints(current_waypoint,1)-x_2_prev;
+    e_y = waypoints(current_waypoint,2)-y_2_prev;
 
-    psi = (atan2(e_y,e_x)) - wrapToPi(X_prev(4));
+    psi = (atan2(e_y,e_x)) - wrapToPi(X_prev(5));
 
     psi = wrapToPi(psi);
     row = sqrt(e_x^2 + e_y^2);
@@ -185,10 +189,10 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         x_ref_dot = 0;
         y_ref_dot = 0;
         %recalculate everything
-        e_x = waypoints(current_waypoint,1)-x_1_prev;
-        e_y = waypoints(current_waypoint,2)-y_1_prev;
+        e_x = waypoints(current_waypoint,1)-x_2_prev;
+        e_y = waypoints(current_waypoint,2)-y_2_prev;
     
-        psi = (atan2(e_y,e_x)) - X_prev(4);
+        psi = (atan2(e_y,e_x)) - X_prev(5);
         psi = wrapToPi(psi);
 
         row = sqrt(e_x^2 + e_y^2);
@@ -206,11 +210,15 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
         u2 = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
 
-        v_path = sqrt(u1^2+Lw0^2 * u2^2); %v1
-        v_2 = u2 + Lw0*((u1*u2-u1*u2)/v_path^2); %second term evaluates to 0?
+        % translate it onto the first trailer
+        v1 = sqrt(u1^2+Lw1^2 * u2^2); 
+        v2 = u2 + Lw1*((u1*u2-u1*u2)/v1^2); %second term evaluates to 0?
 
-
-        phi_path = (atan2(v_2*Lw0,v_path));
+        % translate it onto the tractor
+        v_path = sqrt(v1^2+Lw0^2 * v2^2);
+        v_rot = v2 + Lw0*((v1*v2-v1*v2)/v_path^2); %second term evaluates to 0?
+        
+        phi_path = (atan2(v_rot*Lw0,v_path));
 
 
 
@@ -259,7 +267,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 end
 
 % Initialization of PID values
-k_gains = [ 63 2 20 3]; % sort of tuned
+k_gains = [ 0.9 0.15 0.4 0.5]; % sort of tuned
 epsilon = pi/2-0.05;
 int_val = [0 0]; %integration value
 e_prev = [0 0];
@@ -376,7 +384,7 @@ function drawRobotsystem(x, y, theta, phi1, phi2, trailer1_x, trailer1_y, traile
     axis equal;
 end
 anim = figure('WindowState','maximized');
-for i = 1:length(T)
+for i = length(T)-1:length(T)
     clf(anim);
     hold on;
     xlim([-15 20]); ylim([-10 12]);
