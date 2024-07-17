@@ -171,12 +171,17 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     psi = (atan2(e_y,e_x)) - wrapToPi(X_prev(5));
 
     psi = wrapToPi(psi);
+
+    psi2 = (atan2(waypoints(current_waypoint,2)-X_prev(2),waypoints(current_waypoint,1)-X_prev(1))) - X_prev(3);
+    psi2 = wrapToPi(psi2);
+
     row = sqrt(e_x^2 + e_y^2);
+    row2 = sqrt((waypoints(current_waypoint,1)-X_prev(1))^2 + (waypoints(current_waypoint,2)-X_prev(2))^2);
     row_test(t) = row;
     change_in_waypoint(t) = change_in_waypoint(t-1);
     %changing waypoints
     wp_dist = 0.6; % distance to change waypoints
-    if (row <= wp_dist)
+    if (row2 <= wp_dist)
         if (current_waypoint ~= length(waypoints))
             current_waypoint=current_waypoint + 1;
             change_in_waypoint(t) = change_in_waypoint(t-1) + 1;
@@ -195,6 +200,9 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
         psi = (atan2(e_y,e_x)) - X_prev(5);
         psi = wrapToPi(psi);
 
+        psi2 = (atan2(waypoints(current_waypoint,2)-X_prev(2),waypoints(current_waypoint,1)-X_prev(1))) - X_prev(3);
+        psi2 = wrapToPi(psi2);
+
         row = sqrt(e_x^2 + e_y^2);
     else
         x_ref_dot = 0;
@@ -205,7 +213,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     row_int = int_val(2) + dt*row;
     int_val = [psi_int row_int];
     
-    if (abs(psi) < epsilon)
+    if (abs(psi2) < epsilon)
         u1 = (k_gains(3)*row+k_gains(4)*row_int)/cos(psi) + (e_x*x_ref_dot+e_y*y_ref_dot)/(row*cos(psi));
         tan_dev = ((atan2(e_y,e_x)) - (atan2(e_prev(2),e_prev(1))))/dt;
         u2 = k_gains(1)*psi+k_gains(2)*psi_int + tan_dev;
@@ -225,7 +233,7 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
 
     else
         v_path = 1;
-        phi_path = (psi)/abs(psi)*phi_limit;
+        phi_path = (psi2)/abs(psi2)*phi_limit;
     end
 
     
@@ -262,13 +270,11 @@ function  [v_path, phi_path, e_prev, int_val,current_waypoint] = PID(X_prev,t,in
     end
     e_prev = [e_x, e_y];
 
-
-    
 end
 
-% Initialization of PID values
-k_gains = [ 0.9 0.15 0.4 0.5]; % sort of tuned
-epsilon = pi/2-0.05;
+% Initialization of PID vlues
+k_gains = [ 1.5 0.25 2.1 1.25]; % sort of tuned
+epsilon = pi/2-0.01;
 int_val = [0 0]; %integration value
 e_prev = [0 0];
 current_waypoint = 1;
@@ -383,9 +389,8 @@ function drawRobotsystem(x, y, theta, phi1, phi2, trailer1_x, trailer1_y, traile
     
     axis equal;
 end
-anim = figure('WindowState','maximized');
 for i = length(T)-1:length(T)
-    clf(anim);
+    clf;
     hold on;
     xlim([-15 20]); ylim([-10 12]);
     grid on;
@@ -406,6 +411,7 @@ for i = length(T)-1:length(T)
     pause(0.0001);
 
 end
+
 
 %% Plotting Errors
 %Distance from origin over time of tractor
