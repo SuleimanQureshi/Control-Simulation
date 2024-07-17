@@ -389,8 +389,9 @@ function drawRobotsystem(x, y, theta, phi1, phi2, trailer1_x, trailer1_y, traile
     
     axis equal;
 end
+anim = figure('WindowState','maximized');
 for i = length(T)-1:length(T)
-    clf;
+    clf(anim);
     hold on;
     xlim([-15 20]); ylim([-10 12]);
     grid on;
